@@ -4,6 +4,7 @@ import types
 # Создание фиктивного модуля `imghdr`
 imghdr = types.ModuleType("imghdr")
 sys.modules["imghdr"] = imghdr
+from state_manager import save_state, load_state
 
 import asyncio
 from datetime import datetime, timedelta, time
@@ -579,10 +580,14 @@ chat_id = -1002495997895
 # if __name__ == "__main__":
 #     asyncio.run(main())
 
+# ==== Завантаження стану ====
+state = load_state("state.json")
+dialogue_index = state.get("dialogue_index", {account["name"]: 0 for account in accounts})
+
+
 async def run_accounts(accounts, chat_id):
     clients = []
-    dialogue_index = {account["name"]: 0 for account in accounts}
-
+    
     for account in accounts:
         client = TelegramClient(account["session"], account["api_id"], account["api_hash"])
         await client.start(phone=account["phone"])
@@ -598,7 +603,7 @@ async def run_accounts(accounts, chat_id):
                     question = dialogue["question"]
 
                     if question["from"] == account["name"]:
-                        print(f"🟢 {account['name']} отправляет вопрос: {question['text']}")
+                        print(f"🟢 {account['name']} відправляє питання: {question['text']}")
                         await client.send_message(chat_id, question["text"])
                         await asyncio.sleep(random.randint(45, 380))
 
@@ -606,13 +611,13 @@ async def run_accounts(accounts, chat_id):
                         for other_account, other_client in clients:
                             if response["from"] == other_account["name"]:
                                 if "text" in response:
-                                    print(f"🟢 {other_account['name']} отвечает: {response['text']}")
+                                    print(f"🟢 {other_account['name']} відповідає: {response['text']}")
                                     await other_client.send_message(chat_id, response["text"])
                                 elif "image" in response:
-                                    print(f"🟢 {other_account['name']} отправляет изображение.")
+                                    print(f"🟢 {other_account['name']} відправляє зображення.")
                                     await other_client.send_file(chat_id, response["image"])
                                 elif "video_note" in response:
-                                    print(f"🟢 {other_account['name']} отправляет видео-кружок.")
+                                    print(f"🟢 {other_account['name']} відправляє відео-кружок.")
                                     await other_client.send_file(
                                         chat_id,
                                         response["video_note"],
@@ -626,20 +631,25 @@ async def run_accounts(accounts, chat_id):
                                     )
                                 await asyncio.sleep(random.randint(55, 350))
 
+                    # Оновлення індексу діалогу
                     dialogue_index[account["name"]] += 1
+                    save_state({"dialogue_index": dialogue_index}, "state.json")  # Збереження стану
                 else:
-                    print(f"🔁 Перезапуск диалога для {account['name']}")
+                    print(f"🔁 Перезапуск діалогу для {account['name']}")
                     dialogue_index[account["name"]] = 0
+                    save_state({"dialogue_index": dialogue_index}, "state.json")  # Збереження стану
 
             await asyncio.sleep(1)
 
     tasks = [asyncio.create_task(handle_dialogue())]
     await asyncio.gather(*[client.run_until_disconnected() for _, client in clients], *tasks)
 
-# ==== Главная функция ====
+# ==== Головна функція ====
 async def main():
-    await run_accounts(accounts, chat_id)
+    try:
+        await run_accounts(accounts, chat_id)
+    finally:
+        save_state({"dialogue_index": dialogue_index}, "state.json")  # Збереження стану перед виходом
 
 if __name__ == "__main__":
     asyncio.run(main())
-
