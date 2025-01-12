@@ -19,6 +19,10 @@ accounts = [
         "phone": "+79378670599",
         "session": "session_katya",
         "name": "Катя",
+        "responses_to_messages": {
+            "Привет": ["Хаюшки"],
+            "Ребята. Готовимся есть инсайд. Жду фитбек по готовности": ["Я думаю все готовы уже давно"],
+        },
         "dialogue": [
             {
                 "question": {"text": "Ребят кто во что сегодня играет?", "from": "Катя"},
@@ -45,6 +49,10 @@ accounts = [
         "phone": "+79178691992",
         "session": "session_vanya",
         "name": "Ваня",
+        "responses_to_messages": {
+            "Привет": ["👋"],
+            "Ребята. Готовимся есть инсайд. Жду фитбек по готовности": ["+"],
+        },
         "dialogue": [
             {
                 "question": {"text": "Ребята, кто сегодня уже успел поймать бонус? У меня утро началось с Х200 на Irish Reels. Думаю, день будет огонь!", "from": "Ваня"},
@@ -75,6 +83,9 @@ accounts = [
         "phone": "+79363168089",
         "session": "session_matvey",
         "name": "Матвій",
+        "responses_to_messages": {
+            "Всем привет": ["О есть что-то для нас?"],
+        },
         "dialogue": [
             {
                 "question": {"text": "Хотел поделиться радостной новостью — я сейчас пишу вам с виллы на Бали. Вид на океан просто шикарен. Я не думал что я буду когдато так жить. А имено жить, а не выживать!", "from": "Матвій"},
@@ -138,6 +149,9 @@ accounts = [
         "phone": "+79827280996",
         "session": "session_iryna",
         "name": "Ірина",
+        "responses_to_messages": {
+            "Всем привет": ["Добрый день"],
+        },
         "dialogue": [
             {
                 "question": {"text": "А кто с какой сумы начинал?", "from": "Ірина"},
@@ -194,6 +208,10 @@ accounts = [
         "phone": "+79899314493",
         "session": "session_jenya",
         "name": "Женя",
+        "responses_to_messages": {
+            "Ребята. Готовимся есть инсайд. Жду фитбек по готовности": ["Я готов"],
+            "И да до конца дня жду все переводы на кошелёк": ["Будет сделано бос"],
+        },
         "dialogue": [
             {
                 "question": {"text": "Я вот смотрю на это всё и понимаю как сигналы реально меняют нашу жизнь? Вот я, например, раньше даже не мог представить, что заработаю на машину за два месяца", "from": "Женя"},
@@ -342,6 +360,10 @@ accounts = [
         "phone": "+79886102536",
         "session": "session_evelina",
         "name": "Евелина",
+        "responses_to_messages": {
+            "И да до конца дня жду все переводы на кошелёк": ["Ок"],
+            "Кинул матч. Если у кого-то будут вопросы пишите": ["Ок"],
+        },
         "dialogue": [
             {
                 "question": {"text": "У меня друг заинтересовался сигналами не верил пока сам не показал", "from": "Женя"},
@@ -584,10 +606,10 @@ chat_id = -1002495997895
 state = load_state("state.json")
 dialogue_index = state.get("dialogue_index", {account["name"]: 0 for account in accounts})
 
-
 async def run_accounts(accounts, chat_id):
     clients = []
-    
+    last_responded = {}
+
     for account in accounts:
         client = TelegramClient(account["session"], account["api_id"], account["api_hash"])
         await client.start(phone=account["phone"])
@@ -631,7 +653,6 @@ async def run_accounts(accounts, chat_id):
                                     )
                                 await asyncio.sleep(random.randint(55, 350))
 
-                    # Оновлення індексу діалогу
                     dialogue_index[account["name"]] += 1
                     save_state({"dialogue_index": dialogue_index}, "state.json")  # Збереження стану
                 else:
@@ -641,7 +662,34 @@ async def run_accounts(accounts, chat_id):
 
             await asyncio.sleep(1)
 
-    tasks = [asyncio.create_task(handle_dialogue())]
+    async def handle_incoming_messages(client, account):
+        @client.on(events.NewMessage(chats=chat_id))
+        async def handle_message(event):
+            sender = await event.get_sender()
+            if sender.is_self:
+                return
+
+            message_text = event.message.text.strip()
+            user_key = (sender.id, account["name"])
+
+            print(f"📩 Отримано повідомлення: {message_text} від {sender.id}")
+
+            for key_phrases, responses in account["responses_to_messages"].items():
+                if any(phrase.lower() in message_text.lower() for phrase in (key_phrases if isinstance(key_phrases, tuple) else [key_phrases])):
+                    response = random.choice(responses)
+                    await asyncio.sleep(random.randint(35, 120))
+                    await event.reply(response)
+                    print(f"💬 {account['name']} відповів: {response}")
+                    last_responded[user_key] = datetime.now()
+                    return
+
+            print(f"📩 Неочікуване повідомлення: {message_text}")
+
+    tasks = []
+    for account, client in clients:
+        tasks.append(asyncio.create_task(handle_incoming_messages(client, account)))
+    tasks.append(asyncio.create_task(handle_dialogue()))
+
     await asyncio.gather(*[client.run_until_disconnected() for _, client in clients], *tasks)
 
 # ==== Головна функція ====
