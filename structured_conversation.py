@@ -83,9 +83,6 @@ accounts = [
         "phone": "+79363168089",
         "session": "session_matvey",
         "name": "Матвій",
-        "responses_to_messages": {
-            "Всем привет": ["О есть что-то для нас?"],
-        },
         "dialogue": [
             {
                 "question": {"text": "Хотел поделиться радостной новостью — я сейчас пишу вам с виллы на Бали. Вид на океан просто шикарен. Я не думал что я буду когдато так жить. А имено жить, а не выживать!", "from": "Матвій"},
@@ -627,7 +624,7 @@ async def run_accounts(accounts, chat_id):
                     if question["from"] == account["name"]:
                         print(f"🟢 {account['name']} відправляє питання: {question['text']}")
                         await client.send_message(chat_id, question["text"])
-                        await asyncio.sleep(random.randint(45, 380))
+                        await asyncio.sleep(random.randint(45, 480))
 
                     for response in dialogue["responses"]:
                         for other_account, other_client in clients:
